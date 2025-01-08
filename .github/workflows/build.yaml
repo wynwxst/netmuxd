@@ -17,8 +17,7 @@ jobs:
       - name: Install Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y gcc gcc-aarch64-linux-gnu gcc-arm-linux-gnueabihf \
-            g++-aarch64-linux-gnu g++-aarch64-linux-gnu libc6-dev-i386 \
+          sudo apt-get install -y gcc libc6-dev libc6-dev-i386 \
             build-essential g++ clang pkg-config git libavahi-glib-dev libavahi-client-dev \
             libusb-1.0-0-dev libssl-dev udev libplist++-dev python3 libcurl4-openssl-dev libcurl4t64
           rustup target add x86_64-unknown-linux-gnu
@@ -44,9 +43,10 @@ jobs:
       - name: Install Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu \
-            build-essential pkg-config git libavahi-glib-dev libavahi-client-dev \
-            libusb-1.0-0-dev libssl-dev udev libplist++-dev python3
+          sudo apt-get install -y gcc gcc-aarch64-linux-gnu python3 \
+            g++-aarch64-linux-gnu libc6-dev libc6-arm64-cross libc6-dev-i386 \
+            build-essential g++ clang pkg-config git libavahi-glib-dev libavahi-client-dev \
+            libusb-1.0-0-dev libssl-dev udev libplist++-dev python3 libcurl4-openssl-dev libcurl4t64
       - name: Build
         run: cargo build --release --target aarch64-unknown-linux-gnu
       - uses: actions/upload-artifact@v3
@@ -69,6 +69,10 @@ jobs:
       - name: Install Dependencies
         run: |
           sudo apt-get update
+          sudo apt-get install -y gcc gcc-arm-linux-gnueabihf \
+            g++-arm-linux-gnueabihf libc6-dev libc6-armhf-cross libc6-dev-i386 \
+            build-essential g++ clang pkg-config git libavahi-glib-dev libavahi-client-dev \
+            libusb-1.0-0-dev libssl-dev udev libplist++-dev python3 libcurl4-openssl-dev libcurl4t64
           sudo apt-get install -y gcc-arm-linux-gnueabihf g++-arm-linux-gnueabihf \
             build-essential pkg-config git libavahi-glib-dev libavahi-client-dev \
             libusb-1.0-0-dev libssl-dev udev libplist++-dev python3
