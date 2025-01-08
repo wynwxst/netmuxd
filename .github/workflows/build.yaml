@@ -5,7 +5,7 @@ on:
   push:
     
 jobs:
-  build-linux:
+  build-linux-amd64:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -13,20 +13,74 @@ jobs:
         with:
           toolchain: stable
           override: true
-          targets: aarch64-unknown-linux-gnu, armv7-unknown-linux-gnueabihf, x86_64-unknown-linux-gnu
-      - name: Install cross-compilation tools
+          target: x86_64-unknown-linux-gnu
+      - name: Install Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y gcc-aarch64-linux-gnu gcc-arm-linux-gnueabihf
-      - name: Build all targets
-        run: |
-          cargo build --release --target x86_64-unknown-linux-gnu
-          cargo build --release --target aarch64-unknown-linux-gnu
-          cargo build --release --target armv7-unknown-linux-gnueabihf
+          sudo apt-get install -y gcc gcc-aarch64-linux-gnu gcc-arm-linux-gnueabihf \
+            g++-aarch64-linux-gnu g++-aarch64-linux-gnu libc6-dev-i386 \
+            build-essential g++ clang pkg-config git libavahi-glib-dev libavahi-client-dev \
+            libusb-1.0-0-dev libssl-dev udev libplist++-dev python3 libcurl4-openssl-dev libcurl4t64
+          rustup target add x86_64-unknown-linux-gnu
+      - name: Build
+        run: cargo build --release --target x86_64-unknown-linux-gnu
       - uses: actions/upload-artifact@v3
         with:
-          name: linux-binaries
-          path: target/*/release/
+          name: linux-amd64-binaries
+          path: |
+            target/x86_64-unknown-linux-gnu/release/netmuxd
+            target/x86_64-unknown-linux-gnu/release/add_device
+            target/x86_64-unknown-linux-gnu/release/passthrough
+
+  build-linux-arm64:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+          target: aarch64-unknown-linux-gnu
+      - name: Install Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu \
+            build-essential pkg-config git libavahi-glib-dev libavahi-client-dev \
+            libusb-1.0-0-dev libssl-dev udev libplist++-dev python3
+      - name: Build
+        run: cargo build --release --target aarch64-unknown-linux-gnu
+      - uses: actions/upload-artifact@v3
+        with:
+          name: linux-arm64-binaries
+          path: |
+            target/aarch64-unknown-linux-gnu/release/netmuxd
+            target/aarch64-unknown-linux-gnu/release/add_device
+            target/aarch64-unknown-linux-gnu/release/passthrough
+
+  build-linux-armv7:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+          target: armv7-unknown-linux-gnueabihf
+      - name: Install Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-arm-linux-gnueabihf g++-arm-linux-gnueabihf \
+            build-essential pkg-config git libavahi-glib-dev libavahi-client-dev \
+            libusb-1.0-0-dev libssl-dev udev libplist++-dev python3
+      - name: Build
+        run: cargo build --release --target armv7-unknown-linux-gnueabihf
+      - uses: actions/upload-artifact@v3
+        with:
+          name: linux-armv7-binaries
+          path: |
+            target/armv7-unknown-linux-gnueabihf/release/netmuxd
+            target/armv7-unknown-linux-gnueabihf/release/add_device
+            target/armv7-unknown-linux-gnueabihf/release/passthrough
 
   build-macos:
     runs-on: macos-latest
@@ -36,7 +90,27 @@ jobs:
         with:
           toolchain: stable
           override: true
-          targets: x86_64-apple-darwin, aarch64-apple-darwin
+      - name: Install Dependencies
+        run: |
+          brew install \
+            git \
+            pkg-config \
+            libplist \
+            libusb \
+            openssl \
+            cmake \
+            autoconf \
+            automake \
+            libtool \
+            cython
+          echo "PKG_CONFIG_PATH=/usr/local/opt/libplist/lib/pkgconfig:/usr/local/opt/openssl/lib/pkgconfig:$PKG_CONFIG_PATH" >> $GITHUB_ENV
+          echo "LIBRARY_PATH=/usr/local/opt/libplist/lib:/usr/local/opt/openssl/lib:$LIBRARY_PATH" >> $GITHUB_ENV
+          echo "LDFLAGS=-L/usr/local/opt/libplist/lib -L/usr/local/opt/openssl/lib" >> $GITHUB_ENV
+          echo "CPPFLAGS=-I/usr/local/opt/libplist/include -I/usr/local/opt/openssl/include" >> $GITHUB_ENV
+      - name: Install targets
+        run: |
+          rustup target add x86_64-apple-darwin
+          rustup target add aarch64-apple-darwin
       - name: Build all targets
         run: |
           cargo build --release --target x86_64-apple-darwin
@@ -44,7 +118,10 @@ jobs:
       - uses: actions/upload-artifact@v3
         with:
           name: macos-binaries
-          path: target/*/release/
+          path: |
+            target/*/release/netmuxd
+            target/*/release/add_device
+            target/*/release/passthrough
 
   build-windows:
     runs-on: windows-latest
@@ -54,24 +131,49 @@ jobs:
         with:
           toolchain: stable
           override: true
-          targets: x86_64-pc-windows-msvc, i686-pc-windows-msvc
-      - name: Build all targets
+      - name: Install MSVC Build Tools
+        uses: microsoft/setup-msbuild@v1.1
+      - name: Setup vcpkg
+        uses: lukka/run-vcpkg@v7
+      - name: Install Dependencies
+        run: |
+          vcpkg install --triplet x64-windows-static `
+            libplist:x64-windows-static `
+            libusb:x64-windows-static `
+            openssl:x64-windows-static `
+            zlib:x64-windows-static `
+            pkg-config:x64-windows-static
+          echo "LIBPLIST_STATIC=1" >> $env:GITHUB_ENV
+          echo "VCPKGRS_DYNAMIC=0" >> $env:GITHUB_ENV
+          echo "OPENSSL_DIR=$env:VCPKG_ROOT/installed/x64-windows-static" >> $env:GITHUB_ENV
+          echo "OPENSSL_STATIC=1" >> $env:GITHUB_ENV
+      - name: Install target
+        run: |
+          rustup target add x86_64-pc-windows-msvc
+      - name: Build target
         run: |
           cargo build --release --target x86_64-pc-windows-msvc
-          cargo build --release --target i686-pc-windows-msvc
       - uses: actions/upload-artifact@v3
         with:
           name: windows-binaries
-          path: target/*/release/
+          path: |
+            target/x86_64-pc-windows-msvc/release/netmuxd.exe
+            target/x86_64-pc-windows-msvc/release/add_device.exe
+            target/x86_64-pc-windows-msvc/release/passthrough.exe
 
   docker:
-    needs: build-linux
+    needs: [build-linux-amd64, build-linux-arm64, build-linux-armv7]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y curl libcurl4-openssl-dev
       - uses: actions/download-artifact@v3
         with:
           name: linux-binaries
+          path: dist
       - uses: docker/setup-qemu-action@v3
       - uses: docker/setup-buildx-action@v3
       - uses: docker/login-action@v3
@@ -89,7 +191,7 @@ jobs:
           cache-to: type=gha,mode=max
 
   release:
-    needs: [build-linux, build-macos, build-windows]
+    needs: [build-linux-amd64, build-linux-arm64, build-linux-armv7, build-macos, build-windows]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -102,6 +204,13 @@ jobs:
           tag_name: nightly
           name: Development Build
           prerelease: true
-          files: artifacts/**/*
-          body: Automated development build
-          token: ${{ secrets.GITHUB_TOKEN }}
+          files: |
+            artifacts/linux-binaries/**/*
+            artifacts/macos-binaries/**/*
+            artifacts/windows-binaries/**/*
+          body: |
+            Automated development build containing:
+            - netmuxd
+            - add_device
+            - passthrough
+          token: ${{ secrets.TOKEN }}
