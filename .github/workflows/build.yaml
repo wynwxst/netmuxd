@@ -1,8 +1,9 @@
 name: build
 
 on:
+  workflow_dispatch:
   push:
-
+    
 jobs:
   buildx:
     runs-on: ubuntu-latest
